@@ -1,6 +1,6 @@
-# Sentinel-SDMs
+# ixna-SDM
 
-This repository can be used to replicate the analyses from Kohlberg et al. 2025. The code is to model the current and projected distribution of a forest-dependent sentinel, the varied thrush (_Ixoreus naevius_), across federally managed forests in the Pacific Northwest, USA. 
+This repository can be used to replicate the analyses from Kohlberg et al. 2025. The code provided here models the current and projected distribution of a temperate forest-dependent species, the varied thrush (_Ixoreus naevius_), but can be tailored to presence-absence data for other species of interest.
 
 **main-SDM** is an Rmarkdown script that employs boosted regression trees for species distribution modeling. This script will need to be run first to create objects needed for **gams** and **hab-suitability**.
 

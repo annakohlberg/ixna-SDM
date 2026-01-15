@@ -62,22 +62,22 @@ model_data <- data.frame(
 covar_names <- c(
   mTPI_270 = "Topographic positional index",
   ELEVmn = "Elevation",
-  FR = "Fire refugia",
-  CWD = "Climatic Water Deficit",
-  TDI_270 = "Topographic diversity index",
-  CANCOV = "Canopy cover",
-  OSGI = "Old-growth structural index",
-  STNDHGT = "Stand height")
+  FRmn = "Fire refugia",
+  CWDmn = "Climatic Water Deficit",
+  TDI_270mn = "Topographic diversity index",
+  CANCOVmn = "Canopy cover",
+  OSGImn = "Old-growth structural index",
+  STNDHGTmn = "Stand height")
 
 short_covar_names <- c(
   mTPI_270 = "mTPI",
   ELEVmn = "Elev",
-  FR = "Fr",
-  CWD = "CWD",
-  TDI_270 = "TDI",
-  CANCOV = "CanCov",
-  OSGI = "OGSI",
-  STNDHGT = "StHgt")
+  FRmn = "Fr",
+  CWDmn = "CWD",
+  TDI_270mn = "TDI",
+  CANCOVmn = "CanCov",
+  OSGImn = "OGSI",
+  STNDHGTmn = "StHgt")
 
 # Make correlation plot
 correl = cor(train_data[,2:9],method='spearman')
@@ -245,6 +245,63 @@ ROC = roc(response=test_data$presence,
 plot(ROC)
 legend(x="bottomright",
        legend=c(paste("BRT AUC:",round((ROC$auc),digits=3))))
+
+```
+
+# Assess partial dependence plots
+```{r}
+
+# Generate a dataframe with unscaled covariates
+orig_map <- list(
+  TDI_270mn = station_summary$TDI_270,
+  CWDmn = station_summary$CWD,
+  FRmn = station_summary$FR,
+  STNDHGTmn = station_summary$STNDHGT,
+  OGSImn = station_summary$OGSI,
+  CANCOVmn = station_summary$CANCOV,
+  ELEVmn = station_summary$ELEVmn,
+  mTPI_270 = station_summary$mTPI_270
+)
+
+# Unscaled values
+centers <- sapply(orig_map, function(x) mean(x, na.rm = TRUE))
+scales  <- sapply(orig_map, function(x) sd(x,  na.rm = TRUE))
+
+# Plot PDPs
+par(mfrow = c(2,4))
+for (v in BRT_all$var.names) {
+  
+  pd <- plot(BRT_all, i.var = v, n.trees = best_ntree,
+             return.grid = TRUE, plot.it = FALSE, type = "response",
+             center = FALSE, continuous.resolution = 100)
+  
+  x_scaled <- pd[[v]]
+  x_orig   <- x_scaled * scales[v] + centers[v]
+  
+  plot(x_orig, pd$y, type="l",
+       xlab = paste0(v),
+       ylab = "")
+}
+
+## To see at what elevation range, for example, predicted probability of occurrence is highest:
+v <- "ELEVmn"  # change this to target variable
+
+# Create new pd dataframe
+pd <- plot(BRT_all, i.var = v, n.trees = best_ntree,
+            type = "response", center = FALSE, continuous.resolution = 100,
+            return.grid = TRUE, plot.it = FALSE)
+
+# Unscale back to meters
+x_m <- pd[[v]] * scales[v] + centers[v]
+y   <- pd$y
+
+# Define threshold of interest (here, within 90% of the maximum value)
+threshold <- 0.90 * max(y, na.rm = TRUE)
+
+# Get range of elevation at which probability of occurrence is highest
+keep <- y >= threshold
+range_elev <- range(x_m[keep], na.rm = TRUE)
+range_elev
 
 ```
 

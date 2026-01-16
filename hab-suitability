@@ -1,4 +1,4 @@
-### The following code is a Rmarkdown script used to illustrate and quantify the probability and magnitude of habitat suitability degradation under future climatic water deficit scenarios
+### The following code is a Rmarkdown script used to illustrate and quantify current drivers or distribution and the probability and magnitude of habitat suitability degradation under future climatic water deficit scenarios
 
 # Clear workspace
 rm(list = ls())
@@ -9,43 +9,245 @@ library(raster)
 library(ggplot2)
 library(dplyr)
 library(mgcv)
+library(viridis)
 
 # Read in rasters of current and future predicted distribution maps from code-main
 masked_p <- raster("IXNA_masked_p.tif")
-masked_p2 <- raster("IXNA_masked_p2.tif")
+masked_p2 <- raster("IXNA_masked_p2.tif") # RCP8.5
+masked_p3 <- raster("IXNA_masked_p2.tif") # RCP4.5
 
 plot(masked_p) # This is the CURRENT predicted distribution of the varied thrush
-plot(masked_p2) # This is the FUTURE predicted distribution of the varied thrush
+plot(masked_p2) # This is the FUTURE predicted distribution of the varied thrush (RCP8.5)
+plot(masked_p3) # This is the FUTURE predicted distribution of the varied thrush (RCP4.5)
 
-### Plot the difference
-masked_diffp <- overlay(masked_p, masked_p2, fun=function(x, y) x - y) # future - current
-masked_diffp[masked_diffp < 0] <- NA
+### Plot the difference for p2
+masked_diffp2 <- overlay(masked_p, masked_p2, fun=function(x, y) x - y) # future - current
+masked_diffp2[masked_diffp2 < 0] <- NA
 plot(st_geometry(boundary), box = FALSE, axes = FALSE, col = "white", border = "black", lwd = 0.1)
-plot(masked_diffp, add = TRUE, box = FALSE, axes = FALSE, col = inferno(200, direction = -1))
+plot(masked_diffp2, add = TRUE, box = FALSE, axes = FALSE, col = inferno(256, direction = -1))
 
 # Change in suitability: future - current
-suitability_change <- overlay(masked_p, masked_p2, fun = function(x, y) y - x)
+suitability_change2 <- overlay(masked_p, masked_p2, fun = function(x, y) y - x)
 
 # Filter to only look at decreased suitability
-suitability_decreased <- suitability_change < 0
-plot(suitability_decreased) # Everywhere there was a decrease from current to future
+suitability_decreased2 <- suitability_change2 < 0
+plot(suitability_decreased2) # Everywhere there was a decrease from current to future
 
 # Total decrease in suitability 
-decreased_pixel_count <- cellStats(suitability_decreased, stat = "sum")
+decreased_pixel_count2 <- cellStats(suitability_decreased2, stat = "sum")
 
 # Convert to km² (270m res)
-pixel_area_km2 <- 0.0729  # 270m x 270m
+pixel_area_km2_2 <- prod(res(masked_p2)) / 1e6
+# pixel_area_km2 <- 0.0729  # 270m x 270m
 
 # Total area decreased (in km²)
-total_area_decreased_km2 <- decreased_pixel_count * pixel_area_km2
+total_area_decreased_km2_2 <- decreased_pixel_count2 * pixel_area_km2_2
 
 # Total number of valid (non-NA) pixels
-valid_pixel_count <- cellStats(!is.na(masked_p), stat = "sum")
-total_area_km2 <- valid_pixel_count * pixel_area_km2
+valid_pixel_count2 <- cellStats(!is.na(masked_p2), stat = "sum")
+total_area_km2_2 <- valid_pixel_count2 * pixel_area_km2_2
 
 # Proportion of area decreased
-proportion_decreased <- total_area_decreased_km2 / total_area_km2
-print(paste("Proportion of area decreased:", proportion_lost)) # 70% of habitat decreases
+proportion_decreased2 <- total_area_decreased_km2_2 / total_area_km2_2
+print(paste("Proportion of area decreased:", proportion_decreased2)) # 70% of habitat decreases
+
+### Plot the difference for p3
+masked_diffp3 <- overlay(masked_p, masked_p3, fun=function(x, y) x - y) # future - current
+masked_diffp3[masked_diffp3 < 0] <- NA
+plot(st_geometry(boundary), box = FALSE, axes = FALSE, col = "white", border = "black", lwd = 0.1)
+plot(masked_diffp3, add = TRUE, box = FALSE, axes = FALSE, col = inferno(256, direction = -1))
+
+# Change in suitability: future - current
+suitability_change3 <- overlay(masked_p, masked_p3, fun = function(x, y) y - x)
+
+# Filter to only look at decreased suitability
+suitability_decreased3 <- suitability_change3 < 0
+plot(suitability_decreased3) # Everywhere there was a decrease from current to future
+
+# Total decrease in suitability 
+decreased_pixel_count3 <- cellStats(suitability_decreased3, stat = "sum")
+
+# Convert to km² (270m res)
+pixel_area_km2_3 <- prod(res(masked_p3)) / 1e6
+# pixel_area_km2 <- 0.0729  # 270m x 270m
+
+# Total area decreased (in km²)
+total_area_decreased_km2_3 <- decreased_pixel_count3 * pixel_area_km2_3
+
+# Total number of valid (non-NA) pixels
+valid_pixel_count3 <- cellStats(!is.na(masked_p3), stat = "sum")
+total_area_km2_3 <- valid_pixel_count3 * pixel_area_km2_3
+
+# Proportion of area decreased
+proportion_decreased3 <- total_area_decreased_km2_3 / total_area_km2_3
+print(paste("Proportion of area decreased:", proportion_decreased3)) # 63% of habitat decreases
+
+
+### Quantify current drivers of suitibility 
+
+# Load and align rasters for unscaled covariates
+raster_files <- c("CANCOVmn.tif", 
+                  "OGSImn.tif",
+                  "CWDmn.tif",
+                  "FRmn.tif",
+                  "ELEVmn.tif",
+                  "mTPI_270.tif",
+                  "STNDHGTmn.tif",
+                  "TDI_270mn.tif"
+                  )
+
+# Load each raster into a list and stack; name accordingly
+raster_stack <- stack(lapply(raster_files, raster))
+names(raster_stack) <- tools::file_path_sans_ext(basename(raster_files))
+
+# Align covariates to masked_p grid
+raster_stack <- crop(raster_stack, extent(masked_p))
+raster_stack <- resample(raster_stack, masked_p, method = "bilinear")
+raster_stack <- mask(raster_stack, forestcover, maskvalue = 0)
+
+# Define pixel area in km2
+pixel_area_km2 <- prod(res(masked_p)) / 1e6
+
+# Build dataframe
+xy <- xyFromCell(masked_p, 1:ncell(masked_p))
+df <- data.frame(
+  x = xy[, 1],
+  y = xy[, 2],
+  p_current = getValues(masked_p),
+  p_future  = getValues(masked_p2)
+) %>%
+  bind_cols(as.data.frame(getValues(cov_stack))) %>%
+  filter(!is.na(p_current))
+
+# Write function for percent and km2 meeting X condition
+summarize_split <- function(df, p_thresh, condition, pixel_area_km2) {
+  
+  high <- df %>% filter(p_current >= p_thresh)
+  n_high <- nrow(high)
+  
+  in_cond <- high %>% filter({{ condition }})
+  n_cond <- nrow(in_cond)
+  
+  tibble(
+    n_high = n_high,
+    area_high_km2 = n_high * pixel_area_km2,
+    n_cond = n_cond,
+    area_cond_km2 = n_cond * pixel_area_km2,
+    pct_of_high = ifelse(n_high == 0, NA_real_, 100 * n_cond / n_high))
+}
+
+print_split <- function(label, res, thresh_text) {
+  cat(sprintf("- %s: %.1f%% (%.1f km²) of high-probability habitat (%s)\n",
+              label, res$pct_of_high, res$area_cond_km2, thresh_text))
+}
+
+# Define threshold (here, p = 0.6) and get quantile of interest
+h75 <- as.numeric(quantile(df$STNDHGTmn, 0.75, na.rm = TRUE))  # High stand height
+cwd25 <- as.numeric(quantile(df$CWDmn, 0.25, na.rm = TRUE))  # Low CWD
+e25   <- as.numeric(quantile(df$ELEVmn,    0.25, na.rm = TRUE)) # Low elevation
+e25 <- as.numeric(quantile(df$ELEVmn, 0.75, na.rm = TRUE))  # High elevation (minus to get mid-low)
+
+# Summarize 
+res_h <- summarize_split(df2, p_thresh, STNDHGTmn > h75, pixel_area_km2)
+res_cwd <- summarize_split(df2, p_thresh, CWDmn < cwd25, pixel_area_km2)
+res_elev_low <- summarize_split(df2, p_thresh, ELEVmn < e25, pixel_area_km2)
+res_elev_high <- summarize_split(df2, p_thresh, ELEVmn > e75, pixel_area_km2)
+
+cat(sprintf("\nHigh-probability habitat defined as p ≥ %.2f:\n", p_thresh))
+print_split("Stand height > 75th percentile", res_h, sprintf("STNDHGT > %.2f", h75))
+print_split("CWD < 25th percentile", res_cwd, sprintf("CWD < %.2f", cwd25))
+print_split("Elevation < 25th percentile", res_elev_low,  sprintf("ELEV < %.2f", e25))
+print_split("Elevation > 75th percentile", res_elev_high, sprintf("ELEV > %.2f", e75))
+
+### Change in suitability in high quality habitat (either p ≥ 0.6 or p ≥ 0.8) under RCP8.5
+## Replace all 'df2' to 'df3' for RCP4.5
+
+## for p2 (RCP8.5)
+df2 <- data.frame(
+  x = xy[, 1],
+  y = xy[, 2],
+  p_current = getValues(masked_p),
+  p_future  = getValues(masked_p2)
+) %>%
+  bind_cols(as.data.frame(getValues(raster_stack))) %>%
+  filter(!is.na(p_current))
+
+## for p3 (RCP4.5)
+df3 <- data.frame(
+  x = xy[, 1],
+  y = xy[, 2],
+  p_current = getValues(masked_p),
+  p_future  = getValues(masked_p3)
+) %>%
+  bind_cols(as.data.frame(getValues(raster_stack))) %>%
+  filter(!is.na(p_current))
+
+# for p ≥ 0.6
+p_thresh <- 0.6
+hq <- df2 %>% filter(p_current >= p_thresh)
+
+hq_summ <- hq %>%
+  summarise(
+    n = n(),
+    area_km2 = n * pixel_area_km2,
+    mean_current = mean(p_current, na.rm = TRUE),
+    mean_future  = mean(p_future,  na.rm = TRUE),
+    mean_change  = mean(p_future - p_current, na.rm = TRUE),
+    pct_change   = 100 * mean_change / mean_current,
+    prop_decrease = mean(p_future < p_current, na.rm = TRUE)
+  )
+
+cat(sprintf(
+  "In RCP8.5 for p ≥ 0.6, \nwithin current high-quality habitat (p ≥ %.2f; %.1f km²), mean suitability changes by %.3f%% (Δ=%.3f). %.1f%% of this area decreases.\n",
+  p_thresh, hq_summ$area_km2, hq_summ$pct_change, hq_summ$mean_change, 
+  100 * hq_summ$prop_decrease))
+
+hq_transition <- df2 %>%
+  mutate(hq_now = p_current >= p_thresh,
+         hq_future = p_future >= p_thresh) %>%
+  filter(hq_now)
+
+lost_hq_area <- sum(!hq_transition$hq_future, na.rm = TRUE) * pixel_area_km2
+pct_lost_hq  <- 100 * mean(!hq_transition$hq_future, na.rm = TRUE)
+
+cat(sprintf("In RCP8.5 for p ≥ 0.6, of current high-quality habitat, %.1f%% (%.1f km²) falls below p ≥ %.2f in the future.\n",
+            pct_lost_hq, lost_hq_area, p_thresh))
+
+
+# for p ≥ 0.8
+p_thresh_80 <- 0.8
+
+hq80 <- df2 %>% filter(p_current >= p_thresh_80)
+
+hq80_summ <- hq80 %>%
+  summarise(
+    n = n(),
+    area_km2 = n * pixel_area_km2,
+    mean_current = mean(p_current, na.rm = TRUE),
+    mean_future  = mean(p_future,  na.rm = TRUE),
+    mean_change  = mean(p_future - p_current, na.rm = TRUE),
+    pct_change   = 100 * mean_change / mean_current,
+    prop_decrease = mean(p_future < p_current, na.rm = TRUE)
+  )
+
+cat(sprintf(
+  "In RCP8.5 for p ≥ 0.8, \nWithin current very high-quality habitat (p ≥ %.2f; %.1f km²), mean suitability changes by %.3f%% (Δ=%.4f). %.1f%% of this area decreases.\n",
+  p_thresh_80, hq80_summ$area_km2,
+  hq80_summ$pct_change, hq80_summ$mean_change, 
+  100 * hq80_summ$prop_decrease))
+
+# How much of current p ≥ 0.8 stays ≥ 0.8 in the future?
+hq80_transition <- df2 %>%
+  mutate(hq_now_80 = p_current >= p_thresh_80,
+         hq_future_80 = p_future >= p_thresh_80) %>%
+  filter(hq_now_80)
+
+lost_hq80_area <- sum(!hq80_transition$hq_future_80, na.rm = TRUE) * pixel_area_km2
+pct_lost_hq80  <- 100 * mean(!hq80_transition$hq_future_80, na.rm = TRUE)
+
+cat(sprintf(
+  "In RCP8.5 for p ≥ 0.8, of current very high-quality habitat (p ≥ %.2f), %.1f%% (%.1f km²) falls below %.2f in the future.\n",
+  p_thresh_80, pct_lost_hq80, lost_hq80_area, p_thresh_80))
 
 
 ### Probability of degradation given current suitability

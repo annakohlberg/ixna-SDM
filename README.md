@@ -4,7 +4,7 @@ This repository can be used to replicate the analyses from Kohlberg et al. 2025.
 
 **main-SDM** is an Rmarkdown script that employs boosted regression trees for species distribution modeling. Output includes AUC ROC curves, partial dependence plots, and distribution maps. This script will need to be run first to create objects needed for **gams** and **hab-suitability**.
 
-**gams** is an R script to fit generalized additive models (GAM) to assess marginal effects of predictor variables. We fit two versions of GAM to view both unadjusted effects and marginal effects of each predictor in isolation.
+**gams** is an R script to fit generalized additive models (GAM) to assess marginal effects of predictor variables across interpolated space. We fit two versions of GAM to view both unadjusted effects and marginal effects of each predictor in isolation.
 
 **hab-suitability** is a Rmarkdown script used to illustrate and quantify current drivers of distribution as well as the probability and magnitude of habitat suitability degradation under future climatic water deficit scenarios.
 
